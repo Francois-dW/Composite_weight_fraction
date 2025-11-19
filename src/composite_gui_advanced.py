@@ -2644,6 +2644,11 @@ class CompositeGUIAdvanced:
         
         if file_path:
             try:
+                # Create directory if it doesn't exist
+                directory = os.path.dirname(file_path)
+                if directory and not os.path.exists(directory):
+                    os.makedirs(directory)
+                
                 fig = self.plot_figures[tab_name]
                 fig.savefig(file_path, dpi=300, bbox_inches='tight')
                 self.show_toast("Plot saved successfully")
