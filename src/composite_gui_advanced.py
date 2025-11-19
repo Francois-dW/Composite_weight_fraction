@@ -3,6 +3,27 @@ Composite Material Analysis GUI - Advanced Version
 
 A graphical user interface for composite material calculations and visualization
 with multi-material comparison and data management capabilities.
+
+FILE STRUCTURE:
+    Lines 1-90:     Imports & Helper Classes (Toast notifications)
+    Lines 92-125:   Data Classes (ExperimentalDataPoint, MaterialConfig)
+    Lines 127-234:  Main CompositeGUIAdvanced class initialization
+    Lines 235-285:  Material management (add/delete/switch)
+    Lines 287-930:  UI creation (panels, widgets, tabs)
+    Lines 931-1100: Event handlers & state management
+    Lines 1101-1263: Core calculation methods
+    Lines 1264-1502: File I/O (save/load/export)
+    Lines 1503-2198: Experimental data management
+    Lines 2199-2576: Plotting & visualization
+    Lines 2577+:    Dialog classes (experimental data, curve fitting)
+
+MAIN CLASSES:
+    - ToastNotification: Temporary success/error messages
+    - ExperimentalDataPoint: Single experimental measurement
+    - MaterialConfig: Complete material configuration
+    - CompositeGUIAdvanced: Main application window
+    - ExperimentalDataDialog: Add/edit experimental data
+    - CurveFittingDialog: Parameter optimization dialog
 """
 
 import tkinter as tk
@@ -156,6 +177,9 @@ class MaterialConfig:
         
         # Experimental data
         self.experimental_data = []  # List of ExperimentalDataPoint objects
+        
+        # Plotting control
+        self.plot_enabled = True  # Whether to include this material in plots
     
     def to_dict(self):
         """Convert configuration to dictionary (excluding non-serializable results)"""
@@ -183,7 +207,8 @@ class MaterialConfig:
                 'w_f_test': self.w_f_test
             },
             'timestamp': self.timestamp,
-            'experimental_data': [pt.to_dict() for pt in self.experimental_data]
+            'experimental_data': [pt.to_dict() for pt in self.experimental_data],
+            'plot_enabled': self.plot_enabled
         }
     
     @classmethod
@@ -220,6 +245,9 @@ class MaterialConfig:
         if 'experimental_data' in data:
             config.experimental_data = [ExperimentalDataPoint.from_dict(pt) 
                                        for pt in data['experimental_data']]
+        
+        # Load plot enabled flag
+        config.plot_enabled = data.get('plot_enabled', True)
         
         return config
 
@@ -262,9 +290,17 @@ class CompositeGUIAdvanced:
         # Load first material
         self.load_material(0)
     
+    # ========================================================================
+    # UTILITY METHODS
+    # ========================================================================
+    
     def show_toast(self, message, type="success", duration=2000):
         """Show a toast notification"""
         ToastNotification(self.root, message, duration, type)
+    
+    # ========================================================================
+    # MATERIAL MANAGEMENT
+    # ========================================================================
     
     def add_material(self):
         """Add a new material configuration"""
@@ -277,8 +313,12 @@ class CompositeGUIAdvanced:
         self.materials.append(new_material)
         return len(self.materials) - 1
     
+    # ========================================================================
+    # UI CREATION - INPUT PANEL
+    # ========================================================================
+    
     def create_input_panel(self, parent):
-        """Create the left panel with input fields"""
+        """Create the left panel with input fields and material management"""
         input_frame = ttk.Frame(parent, padding="5")
         input_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         input_frame.columnconfigure(1, weight=1)
@@ -295,6 +335,20 @@ class CompositeGUIAdvanced:
         
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Enable mouse wheel scrolling
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        def _bind_to_mousewheel(event):
+            canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        
+        def _unbind_from_mousewheel(event):
+            canvas.unbind_all("<MouseWheel>")
+        
+        # Bind mouse wheel events when cursor enters/leaves the input panel
+        canvas.bind('<Enter>', _bind_to_mousewheel)
+        canvas.bind('<Leave>', _unbind_from_mousewheel)
         
         canvas.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
@@ -350,6 +404,20 @@ class CompositeGUIAdvanced:
         
         self.matrix_name = self.create_input_row(
             scrollable_frame, row, "Matrix Name:", "Generic Matrix")
+        row += 1
+        
+        # Plot control checkbox
+        plot_control_frame = ttk.Frame(scrollable_frame)
+        plot_control_frame.grid(row=row, column=0, columnspan=2, pady=5, sticky=tk.W)
+        
+        self.plot_enabled_var = tk.BooleanVar(value=True)
+        self.plot_enabled_check = ttk.Checkbutton(
+            plot_control_frame, 
+            text="📊 Include in plots (theoretical + experimental)", 
+            variable=self.plot_enabled_var,
+            command=self.on_plot_enabled_changed
+        )
+        self.plot_enabled_check.pack(side=tk.LEFT, padx=5)
         row += 1
         
         # Matrix Parameters
@@ -498,6 +566,10 @@ class CompositeGUIAdvanced:
         
         return entry
     
+    # ========================================================================
+    # UI CREATION - RESULTS & TABBED INTERFACE
+    # ========================================================================
+    
     def create_results_panel(self, parent):
         """Create the right panel for results and plots"""
         results_frame = ttk.Frame(parent, padding="5")
@@ -573,7 +645,7 @@ class CompositeGUIAdvanced:
         
         # Define columns
         columns = ('Mix', 'Fiber', 'Matrix', 'W_f', 'V_f', 'ρ_c (g/cm³)', 
-                  'E_c (GPa)', 'Case', 'Status')
+                  'E_c (GPa)', 'Case', 'Plot', 'Status')
         self.comparison_tree['columns'] = columns
         
         # Format columns
@@ -631,8 +703,6 @@ class CompositeGUIAdvanced:
         
         ttk.Button(button_frame2, text="🔧 Fit Parameters", 
                   command=self.open_curve_fitting_dialog).pack(side=tk.LEFT, padx=2)
-        ttk.Button(button_frame2, text="📐 Estimate α_pf from Data", 
-                  command=self.estimate_fiber_porosity).pack(side=tk.LEFT, padx=2)
         
         # Data table
         table_frame = ttk.Frame(main_frame)
@@ -723,10 +793,18 @@ class CompositeGUIAdvanced:
         canvas.create_window((0, 0), window=help_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
         
-        # Enable mouse wheel scrolling
+        # Enable mouse wheel scrolling only when mouse is over canvas
         def _on_mousewheel(event):
             canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        
+        def _bind_mousewheel(event):
+            canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        
+        def _unbind_mousewheel(event):
+            canvas.unbind_all("<MouseWheel>")
+        
+        canvas.bind("<Enter>", _bind_mousewheel)
+        canvas.bind("<Leave>", _unbind_mousewheel)
         
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
@@ -962,6 +1040,13 @@ class CompositeGUIAdvanced:
             self.load_material(self.current_material_index)
             self.update_comparison_table()
     
+    def on_plot_enabled_changed(self):
+        """Called when plot enabled checkbox is toggled"""
+        self.save_current_material()
+        status = "enabled" if self.plot_enabled_var.get() else "disabled"
+        self.show_toast(f"Plotting {status} for {self.materials[self.current_material_index].name}", 
+                       type="info", duration=1500)
+    
     def save_current_material(self):
         """Save current form values to the current material configuration"""
         if not self.materials:
@@ -993,6 +1078,9 @@ class CompositeGUIAdvanced:
             mat.v_f_max = float(self.v_f_max.get())
             mat.porosity_exp = float(self.porosity_exp.get())
             mat.w_f_test = float(self.w_f_test.get())
+            
+            # Plot control
+            mat.plot_enabled = self.plot_enabled_var.get()
             
         except ValueError:
             pass  # Ignore invalid values during editing
@@ -1045,8 +1133,15 @@ class CompositeGUIAdvanced:
         self.w_f_test.delete(0, tk.END)
         self.w_f_test.insert(0, str(mat.w_f_test))
         
+        # Plot control
+        self.plot_enabled_var.set(mat.plot_enabled)
+        
         # Update combo
         self.update_material_combo()
+    
+    # ========================================================================
+    # CALCULATION METHODS
+    # ========================================================================
     
     def reset_defaults(self):
         """Reset current material to default values"""
@@ -1223,6 +1318,7 @@ class CompositeGUIAdvanced:
         
         # Add materials
         for mat in self.materials:
+            plot_status = "✓" if mat.plot_enabled else "✗"
             if mat.results:
                 values = (
                     mat.name,
@@ -1233,6 +1329,7 @@ class CompositeGUIAdvanced:
                     f"{mat.results['rho_c']/1000:.3f}",
                     f"{mat.results['E_c']:.2f}",
                     mat.results['case_type'],
+                    plot_status,
                     "✓ Calculated"
                 )
             else:
@@ -1245,9 +1342,14 @@ class CompositeGUIAdvanced:
                     "-",
                     "-",
                     "-",
+                    plot_status,
                     "Not calculated"
                 )
             self.comparison_tree.insert('', tk.END, values=values)
+    
+    # ========================================================================
+    # FILE I/O - SAVE/LOAD CONFIGURATIONS
+    # ========================================================================
     
     def save_configuration(self):
         """Save all material configurations to JSON file"""
@@ -1451,8 +1553,12 @@ class CompositeGUIAdvanced:
         except Exception as e:
             messagebox.showerror("Error", f"Failed to export detailed data:\n{str(e)}")
     
+    # ========================================================================
+    # EXPERIMENTAL DATA MANAGEMENT
+    # ========================================================================
+    
     def update_experimental_data_table(self):
-        """Update the experimental data table"""
+        """Update the experimental data table with all materials' data"""
         # Clear existing items
         for item in self.exp_data_tree.get_children():
             self.exp_data_tree.delete(item)
@@ -1694,41 +1800,6 @@ class CompositeGUIAdvanced:
             self.editing_entry = None
         self.editing_item = None
         self.editing_column = None
-    
-    def old_on_cell_double_click(self, event):
-        """Handle double-click on a cell for inline editing"""
-        # Get the region that was clicked
-        region = self.exp_data_tree.identify_region(event.x, event.y)
-        if region != 'cell':
-            return
-        
-        # Get the column and item
-        column = self.exp_data_tree.identify_column(event.x)
-        item = self.exp_data_tree.identify_row(event.y)
-        
-        if not item:
-            return
-        
-        # Get column index (column is like '#1', '#2', etc.)
-        col_index = int(column.replace('#', '')) - 1
-        
-        # Material column is not editable
-        if col_index == 0:
-            return
-        
-        # Get column name
-        columns = self.exp_data_tree['columns']
-        if col_index >= len(columns):
-            return
-        
-        col_name = columns[col_index]
-        
-        # Get current value
-        values = self.exp_data_tree.item(item)['values']
-        current_value = values[col_index]
-        
-        # Create inline entry widget for editing
-        self.edit_cell(item, col_index, col_name, current_value)
     
     def edit_cell(self, item, col_index, col_name, current_value):
         """Create an entry widget for inline cell editing"""
@@ -2147,377 +2218,23 @@ class CompositeGUIAdvanced:
         
         self.show_toast("Fitted parameters applied successfully!")
     
-    def estimate_fiber_porosity(self):
-        """Estimate and optimize fiber porosity factor (α_pf) from experimental data - All in one window"""
-        mat = self.materials[self.current_material_index]
-        
-        if not mat.experimental_data:
-            messagebox.showwarning("Warning", 
-                                 "No experimental data available.\n"
-                                 "Please add experimental data points first.")
-            return
-        
-        if not mat.results:
-            messagebox.showwarning("Warning",
-                                 "Please calculate the material properties first.\n"
-                                 "Click 'Calculate' button before estimation.")
-            return
-        
-        # Identify V_f_max from data (points where V_f stops increasing)
-        # These are saturated points (Case B) where porosity is from matrix shortage, not fiber porosity
-        all_vf_values = [pt.V_f for pt in mat.experimental_data if pt.V_f is not None]
-        if all_vf_values:
-            # Estimate saturation V_f as the value that appears most frequently at high W_f
-            sorted_data = sorted([(pt.W_f, pt.V_f) for pt in mat.experimental_data if pt.V_f is not None], 
-                               key=lambda x: x[0])
-            
-            # Check if V_f plateaus (becomes nearly constant)
-            if len(sorted_data) >= 3:
-                # Look at the last 3 points
-                last_vf_values = [v for _, v in sorted_data[-3:]]
-                vf_std = np.std(last_vf_values)
-                vf_mean = np.mean(last_vf_values)
-                
-                # If V_f is nearly constant (std < 1% of mean), it's saturated
-                if vf_std < 0.01 * vf_mean:
-                    v_f_saturation = vf_mean
-                    results_text_temp = f"Detected V_f saturation at {v_f_saturation:.4f}\n"
-                else:
-                    v_f_saturation = None
-                    results_text_temp = "No clear V_f saturation detected\n"
-            else:
-                v_f_saturation = None
-                results_text_temp = "Insufficient data to detect saturation\n"
-        else:
-            v_f_saturation = None
-            results_text_temp = "No V_f data available\n"
-        
-        # Filter UNSATURATED points only (Case A - where V_f < saturation or varies significantly)
-        # These are the points where fiber porosity actually matters
-        if v_f_saturation is not None:
-            # Only use points where V_f is noticeably below saturation (>2% difference)
-            threshold = v_f_saturation * 0.98
-            optimization_points = [pt for pt in mat.experimental_data 
-                                  if pt.V_f is not None and pt.V_m is not None 
-                                  and pt.V_p is not None and pt.V_f < threshold]
-            
-            simple_est_points = [pt for pt in mat.experimental_data 
-                                if pt.V_f is not None and pt.V_p is not None 
-                                and pt.V_f > 0 and pt.V_f < threshold]
-        else:
-            # No saturation detected, use all points
-            optimization_points = [pt for pt in mat.experimental_data 
-                                  if pt.V_f is not None and pt.V_m is not None 
-                                  and pt.V_p is not None]
-            
-            simple_est_points = [pt for pt in mat.experimental_data 
-                                if pt.V_f is not None and pt.V_p is not None 
-                                and pt.V_f > 0]
-        
-        if not simple_est_points:
-            messagebox.showwarning("Warning",
-                                 "No data points with both V_f and V_p values.\n"
-                                 "Cannot estimate fiber porosity factor.")
-            return
-        
-        # Create dialog
-        result_dialog = tk.Toplevel(self.root)
-        result_dialog.title("Fiber Porosity Factor (α_pf) Estimation & Optimization")
-        result_dialog.geometry("700x700")
-        result_dialog.transient(self.root)
-        result_dialog.grab_set()
-        
-        # Center the dialog
-        result_dialog.update_idletasks()
-        x = (result_dialog.winfo_screenwidth() // 2) - (result_dialog.winfo_width() // 2)
-        y = (result_dialog.winfo_screenheight() // 2) - (result_dialog.winfo_height() // 2)
-        result_dialog.geometry(f"+{x}+{y}")
-        
-        # Create scrollable canvas
-        canvas = tk.Canvas(result_dialog)
-        scrollbar = ttk.Scrollbar(result_dialog, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
-        
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-        
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-        
-        # Enable mousewheel scrolling
-        def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-        canvas.bind_all("<MouseWheel>", _on_mousewheel)
-        
-        main_frame = ttk.Frame(scrollable_frame, padding="20")
-        main_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Title
-        ttk.Label(main_frame, 
-                 text=f"Fiber Porosity Factor (α_pf) Estimation\nMaterial: {mat.name}",
-                 font=('Arial', 12, 'bold')).pack(pady=(0, 10))
-        
-        # ===== DATA FILTERING INFO =====
-        filter_frame = ttk.LabelFrame(main_frame, text="Data Point Filtering", padding="10")
-        filter_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        total_points = len([pt for pt in mat.experimental_data if pt.V_f is not None])
-        unsaturated_points = len(simple_est_points)
-        saturated_points = total_points - unsaturated_points
-        
-        if v_f_saturation is not None:
-            filter_text = (
-                f"V_f saturation detected at: {v_f_saturation:.4f}\n"
-                f"Total points: {total_points} | Unsaturated (Case A): {unsaturated_points} | Saturated (Case B): {saturated_points}\n"
-                f"Using only UNSATURATED points for α_pf estimation (where fiber porosity matters)"
-            )
-        else:
-            filter_text = (
-                f"No V_f saturation detected - all points vary\n"
-                f"Total points: {total_points}\n"
-                f"Using all points for α_pf estimation"
-            )
-        
-        ttk.Label(filter_frame, text=filter_text, 
-                 font=('Courier', 9), foreground='blue').pack(anchor=tk.W)
-        
-        # ===== SIMPLE ESTIMATION SECTION =====
-        simple_frame = ttk.LabelFrame(main_frame, text="Method 1: Simple Estimation (V_p/V_f)", padding="10")
-        simple_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        # Calculate simple estimates
-        if simple_est_points:
-            estimates = []
-            for pt in simple_est_points:
-                alpha_pf_estimate = pt.V_p / pt.V_f if pt.V_f > 0 else 0
-                estimates.append(alpha_pf_estimate)
-            
-            mean_alpha_pf = np.mean(estimates)
-            std_alpha_pf = np.std(estimates)
-            
-            simple_summary = (
-                f"Unsaturated points: {len(simple_est_points)} | "
-                f"Mean: {mean_alpha_pf:.4f} | "
-                f"Std Dev: {std_alpha_pf:.4f} | "
-                f"Range: {np.min(estimates):.4f} - {np.max(estimates):.4f}"
-            )
-            ttk.Label(simple_frame, text=simple_summary, 
-                     font=('Courier', 9)).pack(anchor=tk.W)
-        else:
-            mean_alpha_pf = mat.fiber_porosity
-            ttk.Label(simple_frame, text="No unsaturated points available for estimation", 
-                     font=('Courier', 9), foreground='red').pack(anchor=tk.W)
-        
-        # ===== OPTIMIZATION SECTION =====
-        optim_frame = ttk.LabelFrame(main_frame, text="Method 2: Optimization (Recommended)", padding="10")
-        optim_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
-        
-        # Results text area
-        results_text = tk.Text(optim_frame, wrap=tk.WORD, height=20, font=('Courier', 9))
-        results_scroll = ttk.Scrollbar(optim_frame, command=results_text.yview)
-        results_text.config(yscrollcommand=results_scroll.set)
-        
-        results_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        results_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        # Auto-run optimization
-        if optimization_points:
-            results_text.insert(tk.END, results_text_temp)
-            results_text.insert(tk.END, f"Using {len(optimization_points)} UNSATURATED points for optimization\n")
-            if v_f_saturation is not None:
-                saturated_count = len([pt for pt in mat.experimental_data 
-                                      if pt.V_f is not None and pt.V_f >= threshold])
-                results_text.insert(tk.END, f"Excluding {saturated_count} saturated points (V_f ≥ {threshold:.4f})\n")
-            results_text.insert(tk.END, f"\nCurrent α_pf: {mat.fiber_porosity:.6f}\n\n")
-            results_text.insert(tk.END, "Running optimization...\n")
-            result_dialog.update()
-            
-            try:
-                from scipy.optimize import minimize
-                
-                # Prepare experimental data
-                exp_data = []
-                for pt in optimization_points:
-                    exp_data.append({
-                        'W_f': pt.W_f,
-                        'V_f_exp': pt.V_f,
-                        'V_m_exp': pt.V_m,
-                        'V_p_exp': pt.V_p
-                    })
-                
-                initial_alpha_pf = mat.fiber_porosity
-                
-                # Objective function
-                def objective(params):
-                    alpha_pf = params[0]
-                    
-                    G_m_temp = mat.matrix_stiffness / (2 * (1 + mat.matrix_poisson))
-                    
-                    temp_fiber = Fiber(
-                        density=mat.fiber_density,
-                        porosity=alpha_pf,
-                        stiffness=mat.fiber_stiffness,
-                        orientation_efficiency_factor=mat.fiber_eta0,
-                        length_efficiency_factor=0.0,
-                        length=mat.fiber_length,
-                        diameter=mat.fiber_diameter
-                    )
-                    temp_fiber.eta1 = temp_fiber.calculate_length_efficiency_factor(G_m_temp)
-                    
-                    temp_matrix = Matrix(
-                        density=mat.matrix_density,
-                        porosity=mat.matrix_porosity,
-                        stiffness=mat.matrix_stiffness,
-                        poisson_ratio=mat.matrix_poisson
-                    )
-                    
-                    temp_composite = Composite_mix(temp_fiber, temp_matrix)
-                    
-                    error = 0
-                    for data in exp_data:
-                        try:
-                            case = Composite_case(
-                                temp_composite,
-                                fiber_mass_fraction=data['W_f'],
-                                max_volume_fiber=mat.v_f_max,
-                                porosity_efficiency_exponent=mat.porosity_exp
-                            )
-                            
-                            if case.determine_case() == 'Case A':
-                                V_f_calc, V_m_calc, V_p_calc = case.calculate_volume_fractions_case_a()
-                            else:
-                                V_f_calc, V_m_calc, V_p_calc = case.calculate_volume_fractions_case_b()
-                            
-                            error += ((V_f_calc - data['V_f_exp']) / max(data['V_f_exp'], 0.01))**2
-                            error += ((V_m_calc - data['V_m_exp']) / max(data['V_m_exp'], 0.01))**2
-                            error += ((V_p_calc - data['V_p_exp']) / max(data['V_p_exp'], 0.01))**2
-                        except:
-                            error += 1000
-                    
-                    return error
-                
-                initial_error = objective([initial_alpha_pf])
-                
-                # Run optimization
-                result = minimize(
-                    objective,
-                    [initial_alpha_pf],
-                    method='L-BFGS-B',
-                    bounds=[(0.0, 0.5)],
-                    options={'maxiter': 100, 'disp': False}
-                )
-                
-                optimal_alpha_pf = result.x[0]
-                final_error = result.fun
-                
-                # Display results
-                results_text.insert(tk.END, "\n" + "="*60 + "\n")
-                results_text.insert(tk.END, "OPTIMIZATION COMPLETED\n")
-                results_text.insert(tk.END, "="*60 + "\n\n")
-                
-                if result.success:
-                    results_text.insert(tk.END, "Status: SUCCESS ✓\n", "success")
-                else:
-                    results_text.insert(tk.END, f"Status: {result.message}\n", "warning")
-                
-                results_text.insert(tk.END, f"Iterations: {result.nit}\n\n")
-                
-                results_text.insert(tk.END, "RESULTS:\n")
-                results_text.insert(tk.END, f"  Initial α_pf:  {initial_alpha_pf:.6f}\n")
-                results_text.insert(tk.END, f"  Optimal α_pf:  {optimal_alpha_pf:.6f}\n", "highlight")
-                results_text.insert(tk.END, f"  Change:        {optimal_alpha_pf - initial_alpha_pf:+.6f} ({100*(optimal_alpha_pf - initial_alpha_pf)/max(initial_alpha_pf, 0.01):+.1f}%)\n\n")
-                
-                results_text.insert(tk.END, f"  Initial error: {initial_error:.6e}\n")
-                results_text.insert(tk.END, f"  Final error:   {final_error:.6e}\n")
-                
-                if initial_error > 0:
-                    improvement = 100 * (initial_error - final_error) / initial_error
-                    results_text.insert(tk.END, f"  Improvement:   {improvement:.1f}%\n", "success")
-                
-                results_text.insert(tk.END, "\n" + "="*60 + "\n")
-                results_text.insert(tk.END, "RECOMMENDATION:\n")
-                results_text.insert(tk.END, "="*60 + "\n")
-                
-                if improvement > 50 and result.success:
-                    results_text.insert(tk.END, f"✓ Use optimized value: α_pf = {optimal_alpha_pf:.6f}\n", "success")
-                    results_text.insert(tk.END, "  Excellent fit! Click 'Apply Optimized Value' below.\n")
-                elif improvement > 10:
-                    results_text.insert(tk.END, f"→ Optimized value is better: α_pf = {optimal_alpha_pf:.6f}\n", "highlight")
-                    results_text.insert(tk.END, "  Moderate improvement. Click 'Apply Optimized Value'.\n")
-                else:
-                    results_text.insert(tk.END, "⚠ Small improvement detected.\n", "warning")
-                    results_text.insert(tk.END, "  Current value may already be good.\n")
-                
-                # Configure text tags for colors
-                results_text.tag_config("success", foreground="green", font=('Courier', 9, 'bold'))
-                results_text.tag_config("warning", foreground="orange", font=('Courier', 9, 'bold'))
-                results_text.tag_config("highlight", foreground="blue", font=('Courier', 9, 'bold'))
-                
-            except Exception as e:
-                results_text.insert(tk.END, f"\nError during optimization:\n{str(e)}\n")
-                import traceback
-                traceback.print_exc()
-                optimal_alpha_pf = mat.fiber_porosity
-        else:
-            results_text.insert(tk.END, results_text_temp)
-            results_text.insert(tk.END, "\n⚠ Cannot run optimization:\n")
-            if v_f_saturation is not None:
-                results_text.insert(tk.END, f"  All data points are saturated (V_f ≈ {v_f_saturation:.4f})\n")
-                results_text.insert(tk.END, "  Fiber porosity (α_pf) cannot be estimated from saturated data.\n")
-                results_text.insert(tk.END, "  → Porosity at saturation is due to matrix shortage, not fiber voids.\n\n")
-                results_text.insert(tk.END, "RECOMMENDATION:\n")
-                results_text.insert(tk.END, "  Add data points with lower W_f (where V_f varies)\n")
-                results_text.insert(tk.END, "  to estimate fiber porosity factor.\n")
-            else:
-                results_text.insert(tk.END, "  Need data points with V_f, V_m, AND V_p values.\n\n")
-                results_text.insert(tk.END, f"Available: {len(simple_est_points)} points with V_f and V_p only.\n")
-                results_text.insert(tk.END, "  → Can only use simple estimation (mean value).\n")
-            optimal_alpha_pf = mean_alpha_pf if simple_est_points else mat.fiber_porosity
-        
-        # ===== BUTTONS =====
-        button_frame = ttk.Frame(main_frame)
-        button_frame.pack(pady=(10, 0))
-        
-        def apply_optimized():
-            if optimization_points:
-                mat.fiber_porosity = optimal_alpha_pf
-                self.load_material(self.current_material_index)
-                self.calculate_current()
-                self.show_toast(f"Applied optimized α_pf = {optimal_alpha_pf:.6f}")
-                result_dialog.destroy()
-            else:
-                messagebox.showinfo("Info", "Optimization was not available. Use 'Apply Mean Value' instead.")
-        
-        def apply_mean():
-            mat.fiber_porosity = mean_alpha_pf
-            self.load_material(self.current_material_index)
-            self.show_toast(f"Applied mean α_pf = {mean_alpha_pf:.4f}")
-            result_dialog.destroy()
-        
-        if optimization_points:
-            ttk.Button(button_frame, text="✓ Apply Optimized Value (Recommended)", 
-                      command=apply_optimized, style='Accent.TButton').pack(side=tk.LEFT, padx=5)
-            ttk.Button(button_frame, text="Apply Mean Value", 
-                      command=apply_mean).pack(side=tk.LEFT, padx=5)
-        else:
-            ttk.Button(button_frame, text="✓ Apply Mean Value", 
-                      command=apply_mean).pack(side=tk.LEFT, padx=5)
-        
-        ttk.Button(button_frame, text="Close", 
-                  command=result_dialog.destroy).pack(side=tk.LEFT, padx=5)
+    # ========================================================================
+    # PLOTTING & VISUALIZATION
+    # ========================================================================
     
     def generate_plots(self):
-        """Generate comparison plots for all calculated materials"""
-        # Get materials with results
-        calculated_materials = [mat for mat in self.materials if mat.results]
+        """Generate comparison plots for all calculated materials with plot_enabled=True"""
+        # Get materials with results AND plot enabled
+        calculated_materials = [mat for mat in self.materials if mat.results and mat.plot_enabled]
         
         if not calculated_materials:
-            messagebox.showwarning("Warning", "No calculated materials to plot!")
+            # Check if there are calculated materials but all disabled
+            all_calculated = [mat for mat in self.materials if mat.results]
+            if all_calculated:
+                messagebox.showwarning("Warning", "All materials are excluded from plotting!\n\n" +
+                                     "Enable 'Include in plots' checkbox for at least one material.")
+            else:
+                messagebox.showwarning("Warning", "No calculated materials to plot!")
             return
         
         try:
@@ -2881,6 +2598,10 @@ class CompositeGUIAdvanced:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to save plot:\n{str(e)}")
 
+
+# ============================================================================
+# DIALOG CLASSES
+# ============================================================================
 
 class ExperimentalDataDialog:
     """Dialog for adding/editing experimental data points"""

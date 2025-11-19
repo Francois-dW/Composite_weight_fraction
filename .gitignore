@@ -37,9 +37,12 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# Output (optional - remove if you want to track output files)
+# Output
 output/*.png
 !output/.gitkeep
+
+# Examples (optional - remove if you want to track example files)
+# examples/*.csv
 
 # Jupyter Notebook
 .ipynb_checkpoints
