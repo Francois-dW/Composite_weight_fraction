@@ -1,0 +1,64 @@
+% Appendix Reference for Composite Material Analysis Tool
+% Copy this into your Overleaf project appendix
+
+\section{Composite Material Analysis Tool}
+
+The calculations and analysis presented in this work were performed using a custom-developed Python-based Composite Material Analysis Tool. This software implements theoretical models for fiber-reinforced composite materials, including the Halpin-Tsai equations and rule of mixtures approaches.
+
+\subsection{Key Features}
+
+The tool provides:
+\begin{itemize}
+    \item Calculation of composite properties based on constituent materials (fiber and matrix)
+    \item Automatic determination of analysis cases (excess matrix vs. fiber saturation)
+    \item Porosity effects modeling with efficiency exponents
+    \item Fiber length and orientation efficiency factor calculations
+    \item Multi-material comparison capabilities
+    \item Experimental data integration with curve fitting optimization
+    \item Parameter estimation from experimental measurements
+\end{itemize}
+
+\subsection{Theoretical Background}
+
+The composite stiffness is calculated using:
+\begin{equation}
+E_c = (\eta_0 \eta_1 V_f E_f + V_m E_m)(1 - V_p)^n
+\end{equation}
+
+where $E_c$ is the composite stiffness, $\eta_0$ is the fiber orientation efficiency factor, $\eta_1$ is the fiber length efficiency factor, $V_f$ is the fiber volume fraction, $E_f$ is the fiber stiffness, $V_m$ is the matrix volume fraction, $E_m$ is the matrix stiffness, $V_p$ is the porosity volume fraction, and $n$ is the porosity efficiency exponent.
+
+The fiber length efficiency factor is calculated according to:
+\begin{equation}
+\eta_1 = 1 - \frac{\tanh(\beta L/2)}{\beta L/2}
+\end{equation}
+
+where $\beta = \frac{2G_m}{E_f \ln(\kappa / \text{aspect ratio})}$, $G_m$ is the matrix shear modulus, $L$ is the fiber length, and $\kappa$ is a packing parameter.
+
+\subsection{Software Availability}
+
+The Composite Material Analysis Tool is available as open-source software:
+
+\begin{itemize}
+    \item \textbf{Repository:} \url{https://github.com/Francois-dW/Composite_weight_fraction}
+    \item \textbf{Version:} November 2025 (with curve fitting optimization)
+    \item \textbf{License:} Educational and research purposes
+    \item \textbf{Platform:} Python 3.8+ with NumPy, Matplotlib, and SciPy
+    \item \textbf{Executable:} Standalone Windows executable available (73.8 MB)
+\end{itemize}
+
+The software includes comprehensive documentation, validation test cases, and example experimental data files. All calculations can be reproduced using the provided source code and input parameters documented in this work.
+
+% BibTeX entry for references section:
+% Copy this into your .bib file
+
+% @misc{composite_analysis_tool_2025,
+%   author       = {de Wet, François},
+%   title        = {Composite Material Analysis Tool},
+%   year         = {2025},
+%   publisher    = {GitHub},
+%   howpublished = {\url{https://github.com/Francois-dW/Composite_weight_fraction}},
+%   note         = {Python-based tool for fiber-reinforced composite analysis with experimental data integration}
+% }
+
+% In-text citation example:
+% All composite property calculations were performed using the Composite Material Analysis Tool \cite{composite_analysis_tool_2025}.

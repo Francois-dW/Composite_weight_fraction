@@ -2628,7 +2628,7 @@ class CompositeGUIAdvanced:
             messagebox.showwarning("Warning", "No plot available to save.")
             return
         
-        default_filename = tab_name.lower().replace(" ", "_") + ".png"
+        default_filename = tab_name.lower().replace(" ", "_").replace("/", "_").replace("\\", "_") + ".png"
         file_path = filedialog.asksaveasfilename(
             defaultextension=".png",
             initialfile=default_filename,
@@ -2644,10 +2644,13 @@ class CompositeGUIAdvanced:
         
         if file_path:
             try:
+                # Convert to absolute path to handle relative paths correctly
+                file_path = os.path.abspath(file_path)
+                
                 # Create directory if it doesn't exist
                 directory = os.path.dirname(file_path)
-                if directory and not os.path.exists(directory):
-                    os.makedirs(directory)
+                if directory:
+                    os.makedirs(directory, exist_ok=True)
                 
                 fig = self.plot_figures[tab_name]
                 fig.savefig(file_path, dpi=300, bbox_inches='tight')
