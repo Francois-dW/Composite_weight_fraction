@@ -833,12 +833,15 @@ class CompositeGUIAdvanced:
             "• Matrix Name: Type of matrix (e.g., 'Epoxy 3501-6')\n\n"
             "MATRIX PROPERTIES:\n"
             "• Density (g/cm³): Mass per unit volume (typical: 1.0-1.5)\n"
-            "• Porosity: Void fraction in matrix (0.0 = no voids)\n"
+            "• Porosity Factor (α_pm): Matrix porosity coefficient (typically 0.0)\n"
+            "  → Controls void content in matrix phase\n"
             "• Stiffness (GPa): Elastic modulus (typical: 2-5)\n"
             "• Poisson Ratio: Lateral strain ratio (typical: 0.3-0.4)\n\n"
             "FIBER PROPERTIES:\n"
             "• Density (g/cm³): Mass per unit volume (typical: 1.8-2.8)\n"
-            "• Porosity: Void fraction in fiber (usually 0.0)\n"
+            "• Porosity Factor (α_pf): Fiber porosity coefficient (typical: 0.0-0.3)\n"
+            "  → Accounts for voids between/within fiber bundles\n"
+            "  → Can be estimated from experimental data via curve fitting\n"
             "• Stiffness (GPa): Elastic modulus (typical: 70-400)\n"
             "• Orientation Efficiency (η₀): Fiber alignment factor (1.0 = perfect)\n"
             "• Length Efficiency (η₁): Calculated automatically\n"
@@ -897,8 +900,11 @@ class CompositeGUIAdvanced:
             "• '🗑️ Delete' removes current material (must have at least 1)\n"
             "• Each material has its own properties and test W_f\n"
             "• 'Calculate All' runs calculations for all materials\n"
+            "• '📊 Include in plots' checkbox controls plot visibility\n"
+            "  → Uncheck to hide a material from comparison plots\n"
+            "  → Useful when comparing subset of materials\n"
             "• 'Comparison Table' shows all materials side-by-side\n"
-            "• Plots overlay all materials with color-coded lines")
+            "• Plots overlay enabled materials with color-coded lines")
         
         # Section 7: Plot Types
         self.add_help_section(content_frame, "📊 Plot Types",
@@ -917,15 +923,43 @@ class CompositeGUIAdvanced:
             "4. FIBER EFFICIENCY COMPARISON:\n"
             "   Shows fiber length efficiency factor (η₁) vs W_f")
         
-        # Section 8: Color Scheme
-        self.add_help_section(content_frame, "🎨 Color Scheme",
-            "Each material gets 3 shades of the same base color:\n"
-            "• Light shade: Reference lines (V_f, no-porosity)\n"
-            "• Medium shade: Primary data (density, stiffness)\n"
-            "• Dark shade: Secondary data (V_p, porosity)\n\n"
-            "This makes it easy to see which lines belong to the same material!")
+        # Section 8: Color Scheme & Plot Control
+        self.add_help_section(content_frame, "🎨 Color Scheme & Plot Control",
+            "Each material gets a distinct color using HSV color space:\n"
+            "• Different hues for different materials\n"
+            "• Solid lines: Theoretical curves calculated from properties\n"
+            "• Scatter points: Experimental data (if available)\n"
+            "• All curves/points for same material share same color\n\n"
+            "PLOT CONTROL:\n"
+            "• Use '📊 Include in plots' checkbox to show/hide materials\n"
+            "• Comparison Table shows plot status (✓/✗)\n"
+            "• Only materials with ✓ appear in generated plots")
         
-        # Section 9: Export Options
+        # Section 9: Experimental Data Management
+        self.add_help_section(content_frame, "🔬 Experimental Data Management",
+            "The 'Experimental Data' tab allows you to manage measured data:\n\n"
+            "ADDING DATA:\n"
+            "• Click '+ Add Data Point' to manually enter measurements\n"
+            "• Required: W_f (fiber weight fraction)\n"
+            "• Optional: V_f, V_m, V_p, E_c, ρ_c, notes\n"
+            "• Double-click cells to edit inline\n\n"
+            "IMPORTING/EXPORTING:\n"
+            "• 'Import from CSV' loads experimental data from file\n"
+            "• CSV format: W_f, V_f, V_m, V_p, E_c, rho_c, Notes\n"
+            "• 'Export to CSV' saves experimental data\n\n"
+            "CURVE FITTING:\n"
+            "• Click '🔧 Fit Parameters' to optimize material properties\n"
+            "• Uses scipy L-BFGS-B optimization\n"
+            "• Can fit: ρ_m, ρ_f, α_pf, α_pm, V_f_max\n"
+            "• Automatically detects fiber saturation point\n"
+            "• Choose optimization target: volume fractions or density\n"
+            "• Smart initial estimates improve convergence\n\n"
+            "VISUALIZATION:\n"
+            "• Experimental points appear as scatter markers on plots\n"
+            "• Compare theoretical curves vs measured data\n"
+            "• Validate model predictions against experiments")
+        
+        # Section 10: Export Options
         self.add_help_section(content_frame, "💾 Export Options",
             "THREE EXPORT BUTTONS:\n\n"
             "📁 EXPORT CURRENT RESULTS:\n"
@@ -940,7 +974,7 @@ class CompositeGUIAdvanced:
             "   Exports full data set across W_f range\n"
             "   Perfect for plotting in Excel/MATLAB/Python")
         
-        # Section 10: Save/Load
+        # Section 11: Save/Load
         self.add_help_section(content_frame, "💿 Save/Load Configurations",
             "SAVE CONFIGURATION:\n"
             "• Saves all material properties to JSON file\n"
@@ -951,7 +985,7 @@ class CompositeGUIAdvanced:
             "• Restores all materials and their properties\n"
             "• Click 'Calculate All' to recompute results")
         
-        # Section 11: Key Formulas
+        # Section 12: Key Formulas
         self.add_help_section(content_frame, "📐 Key Formulas",
             "COMPOSITE STIFFNESS:\n"
             "E_c = (η₀ η₁ V_f E_f + V_m E_m)(1 - V_p)ⁿ\n\n"
@@ -963,7 +997,7 @@ class CompositeGUIAdvanced:
             "η₁ = 1 - tanh(βL/2) / (βL/2)\n"
             "where β depends on fiber geometry and matrix stiffness")
         
-        # Section 12: Tips
+        # Section 13: Tips
         self.add_help_section(content_frame, "💡 Tips & Best Practices",
             "• Start with default values to understand behavior\n"
             "• Name your materials descriptively for easy identification\n"
@@ -973,7 +1007,13 @@ class CompositeGUIAdvanced:
             "• Save configurations to build a material library\n"
             "• W_f between 0.3-0.6 is typical for structural composites\n"
             "• Higher fiber content increases stiffness but may add porosity\n"
-            "• Watch for Case B transition where porosity increases sharply")
+            "• Watch for Case B transition where porosity increases sharply\n\n"
+            "EXPERIMENTAL DATA TIPS:\n"
+            "• Need 3+ unsaturated data points for reliable curve fitting\n"
+            "• Volume fractions (V_f, V_m, V_p) more reliable than density alone\n"
+            "• Fiber porosity factor (α_pf) should only be fit from unsaturated data\n"
+            "• Use 'Include in plots' to hide/show materials during comparison\n"
+            "• Import sample data from examples/ folder to see proper format")
     
     def add_help_section(self, parent, title, content, height=None):
         """Helper to add a formatted help section"""
