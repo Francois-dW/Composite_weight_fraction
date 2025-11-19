@@ -275,18 +275,23 @@ class CompositeGUIAdvanced:
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         
-        # Create main container
-        main_container = ttk.Frame(self.root, padding="10")
-        main_container.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        main_container.columnconfigure(0, weight=1)
-        main_container.columnconfigure(1, weight=3)
-        main_container.rowconfigure(0, weight=1)
+        # Create main container with PanedWindow for resizable panels
+        main_container = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
+        main_container.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=10, pady=10)
+        
+        # Create frames for left and right panels
+        left_frame = ttk.Frame(main_container, padding="5")
+        right_frame = ttk.Frame(main_container, padding="5")
+        
+        # Add frames to PanedWindow
+        main_container.add(left_frame, weight=1)
+        main_container.add(right_frame, weight=3)
         
         # Create input panel (left side)
-        self.create_input_panel(main_container)
+        self.create_input_panel(left_frame)
         
         # Create results and plot panel (right side)
-        self.create_results_panel(main_container)
+        self.create_results_panel(right_frame)
         
         # Load first material
         self.load_material(0)
@@ -320,9 +325,13 @@ class CompositeGUIAdvanced:
     
     def create_input_panel(self, parent):
         """Create the left panel with input fields and material management"""
-        input_frame = ttk.Frame(parent, padding="5")
-        input_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        input_frame.columnconfigure(1, weight=1)
+        # Parent is already the left frame from PanedWindow
+        input_frame = parent
+        
+        # Configure grid: canvas expands, scrollbar has fixed width
+        input_frame.rowconfigure(0, weight=1)
+        input_frame.columnconfigure(0, weight=1)
+        input_frame.columnconfigure(1, weight=0)  # Fixed width for scrollbar
         
         # Add scrollbar for input panel
         canvas = tk.Canvas(input_frame, highlightthickness=0)
@@ -353,8 +362,10 @@ class CompositeGUIAdvanced:
         
         canvas.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
-        input_frame.rowconfigure(0, weight=1)
-        input_frame.columnconfigure(0, weight=1)
+        
+        # Configure scrollable_frame columns for consistent spacing
+        scrollable_frame.columnconfigure(0, weight=0)  # Labels - fixed width
+        scrollable_frame.columnconfigure(1, weight=1)  # Input fields - expand
         
         # Title
         title = ttk.Label(scrollable_frame, text="Material Configuration", 
@@ -573,8 +584,8 @@ class CompositeGUIAdvanced:
     
     def create_results_panel(self, parent):
         """Create the right panel for results and plots"""
-        results_frame = ttk.Frame(parent, padding="5")
-        results_frame.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S))
+        # Parent is already the right frame from PanedWindow
+        results_frame = parent
         results_frame.columnconfigure(0, weight=1)
         results_frame.rowconfigure(1, weight=1)
         
