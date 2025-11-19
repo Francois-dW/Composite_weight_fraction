@@ -2,6 +2,16 @@
 
 A comprehensive Python application for analyzing composite materials with fiber reinforcement.
 
+## 🚀 Quick Start - Standalone Executable
+
+**Download the ready-to-use executable (no Python installation required):**
+
+📥 [**CompositeAnalysisToolAdvanced.exe**](https://github.com/Francois-dW/Composite_weight_fraction/raw/main/dist/CompositeAnalysisToolAdvanced.exe) (73.8 MB)
+
+Simply download and run - includes all features and dependencies!
+
+---
+
 ## 🎯 Version Overview
 
 This project includes **two versions**:
@@ -12,10 +22,12 @@ This project includes **two versions**:
 - Basic plotting
 - Ideal for: Individual calculations, learning, quick checks
 
-### **Advanced Version** (`composite_gui_advanced.py`) ⭐ NEW!
+### **Advanced Version** (`composite_gui_advanced.py`) ⭐ RECOMMENDED!
 - **Multi-material comparison** (unlimited materials)
 - **Naming system** (fiber, matrix, mix names)
 - **Data management** (save/load configurations)
+- **Experimental data integration** with CSV import/export
+- **Curve fitting optimization** for parameter estimation
 - **Flexible CSV export** with sampling options
 - **Comparison plots** (side-by-side analysis)
 - **Comparison table** (all materials at a glance)
@@ -90,6 +102,20 @@ Composite fiber/
   - Name your composite mixes
   - Professional documentation support
 
+- **Experimental Data Integration** 🆕
+  - Import experimental data from CSV
+  - Add/edit/delete data points manually
+  - Visualize experimental vs. theoretical data
+  - Support for partial data (only W_f required)
+
+- **Curve Fitting Optimization** 🆕
+  - Automatic parameter estimation from experimental data
+  - Fit densities, porosities, V_f_max, stiffness
+  - Multiple optimization targets (stiffness, density, volume fractions)
+  - Smart initial value estimation
+  - L-BFGS-B optimization algorithm
+  - Saturation detection and handling
+
 - **Data Management**
   - Save all configurations to JSON
   - Load previously saved configurations
@@ -112,17 +138,24 @@ Composite fiber/
 
 ## Installation
 
-### Requirements
+### Option 1: Standalone Executable (Easiest)
+1. Download [CompositeAnalysisToolAdvanced.exe](https://github.com/Francois-dW/Composite_weight_fraction/raw/main/dist/CompositeAnalysisToolAdvanced.exe)
+2. Run the executable - no installation needed!
+
+### Option 2: Python Source Code
+
+#### Requirements
 - Python 3.8 or higher
 - NumPy
 - Matplotlib
+- SciPy (for curve fitting)
 - tkinter (usually included with Python)
 
-### Setup
+#### Setup
 1. Ensure you have Python installed
 2. Install required packages:
    ```bash
-   pip install numpy matplotlib
+   pip install numpy matplotlib scipy
    ```
 
 ## Usage
@@ -175,6 +208,7 @@ stiffness = case.calculate_composite_stiffness()
 
 ## GUI Instructions
 
+### Basic Usage
 1. **Input Parameters**
    - Fill in material properties in the left panel
    - Default values are pre-loaded from reference case
@@ -194,6 +228,29 @@ stiffness = case.calculate_composite_stiffness()
 
 4. **Reset**
    - Click "Reset to Defaults" to restore original values
+
+### Advanced Features (Advanced Version)
+5. **Multi-Material Management**
+   - Use "Add Material" to create new configurations
+   - Switch between materials using the dropdown
+   - "Delete Current" removes selected material
+
+6. **Experimental Data** 🆕
+   - Go to "Experimental Data" tab
+   - Click "Add Data Point" to enter measurements
+   - "Import from CSV" to load multiple points
+   - "Export to CSV" to save data
+
+7. **Curve Fitting** 🆕
+   - After adding experimental data, click "🔧 Fit Parameters"
+   - Select which parameters to optimize
+   - Choose optimization target (density, stiffness, or volume fractions)
+   - Click "▶ Run Fitting" to optimize
+   - Review results and "✓ Apply Parameters" if satisfied
+
+8. **Save/Load**
+   - "Save Configuration" to preserve all materials
+   - "Load Configuration" to restore saved work
 
 ## Key Formulas
 
@@ -224,6 +281,22 @@ where β = 2G_m / (E_f ln(κ / aspect_ratio))
 - **Fiber:** ρ_f = 2.60 g/cm³, E_f = 80 GPa, α_pf = 0.00
 - **Geometry:** L = 10000 mm, D = 0.016 mm (aspect ratio = 625,000)
 - **Composite:** V_f_max = 0.60, n = 2
+
+## Latest Updates (November 2025)
+
+- ✅ **Curve fitting optimization** - Automatically estimate material parameters from experimental data
+- ✅ **Experimental data integration** - Import/export CSV, visualize experimental vs. theoretical
+- ✅ **Improved saturation detection** - Smart handling of Case A/B transitions
+- ✅ **Standalone executable** - No Python installation required (73.8 MB download)
+- ✅ **Fixed scipy compatibility** - Includes all required dependencies
+- ✅ **Enhanced error handling** - Better division by zero protection
+
+## Documentation
+
+- [Advanced Features Guide](docs/ADVANCED_FEATURES.md) - Complete guide to advanced version
+- [Experimental Data Guide](docs/EXPERIMENTAL_DATA_GUIDE.md) - Curve fitting and data integration
+- [Project Structure](docs/PROJECT_STRUCTURE.md) - Technical documentation
+- [Corrections Summary](docs/CORRECTIONS_SUMMARY.md) - Technical corrections log
 
 ## Authors
 
