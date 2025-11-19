@@ -5,9 +5,20 @@ block_cipher = None
 a = Analysis(
     ['run_gui_advanced.py'],
     pathex=[],
-    binaries=[],
+    binaries=[
+        ('C:\\Users\\franc\\.conda\\envs\\WTT1\\Library\\bin\\ffi.dll', '.'),
+        ('C:\\Users\\franc\\.conda\\envs\\WTT1\\Library\\bin\\libbz2.dll', '.'),
+        ('C:\\Users\\franc\\.conda\\envs\\WTT1\\Library\\bin\\libcrypto-3-x64.dll', '.'),
+        ('C:\\Users\\franc\\.conda\\envs\\WTT1\\Library\\bin\\libexpat.dll', '.'),
+        ('C:\\Users\\franc\\.conda\\envs\\WTT1\\Library\\bin\\liblzma.dll', '.'),
+        ('C:\\Users\\franc\\.conda\\envs\\WTT1\\Library\\bin\\libssl-3-x64.dll', '.'),
+        ('C:\\Users\\franc\\.conda\\envs\\WTT1\\Library\\bin\\tcl86t.dll', '.'),
+        ('C:\\Users\\franc\\.conda\\envs\\WTT1\\Library\\bin\\tk86t.dll', '.'),
+    ],
     datas=[
         ('src', 'src'),
+        ('C:\\Users\\franc\\.conda\\envs\\WTT1\\Library\\lib\\tcl8.6', 'tcl'),
+        ('C:\\Users\\franc\\.conda\\envs\\WTT1\\Library\\lib\\tk8.6', 'tk'),
     ],
     hiddenimports=[
         'tkinter',

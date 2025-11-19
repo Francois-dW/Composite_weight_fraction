@@ -37,6 +37,7 @@ import os
 import json
 import csv
 from datetime import datetime
+from scipy.optimize import minimize, differential_evolution
 
 # Add current directory to path if running directly
 if __name__ == "__main__":
@@ -2953,8 +2954,6 @@ class CurveFittingDialog:
     
     def run_fitting(self):
         """Run the curve fitting optimization with improved algorithm"""
-        from scipy.optimize import minimize, differential_evolution
-        
         self.results_text.delete(1.0, tk.END)
         self.results_text.insert(tk.END, "Analyzing experimental data...\n\n")
         self.dialog.update()
@@ -3177,7 +3176,13 @@ class CurveFittingDialog:
                 for i, param_name in enumerate(param_names):
                     original = getattr(self.material, param_name)
                     fitted = result.x[i]
-                    change = ((fitted - original) / original) * 100
+                    
+                    # Calculate percentage change (avoid division by zero)
+                    if abs(original) > 1e-10:
+                        change = ((fitted - original) / original) * 100
+                        change_str = f"{change:+.2f}%"
+                    else:
+                        change_str = f"(from ~0 to {fitted:.6f})"
                     
                     self.fitted_params[param_name] = fitted
                     
@@ -3185,7 +3190,7 @@ class CurveFittingDialog:
                         f"{param_name}:\n"
                         f"  Original: {original:.6f}\n"
                         f"  Fitted:   {fitted:.6f}\n"
-                        f"  Change:   {change:+.2f}%\n\n")
+                        f"  Change:   {change_str}\n\n")
                 
                 self.results_text.insert(tk.END, 
                     "\nClick 'Apply Parameters' to use these fitted values.\n")
